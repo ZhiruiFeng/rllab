@@ -28,7 +28,7 @@ algo = TRPO(
     baseline=baseline,
     batch_size=4000,
     max_path_length=200,
-    n_itr=120,
+    n_itr=50,
     discount=0.99,
     step_size=0.01,
     # optimizer=ConjugateGradientOptimizer(hvp_approach=FiniteDifferenceHvp(base_eps=1e-5))
@@ -37,8 +37,9 @@ algo = TRPO(
 
 run_experiment_lite(
     algo.train(),
-    n_parallel=2,
+    n_parallel=4,
     snapshot_mode="last",
-    seed=1
+    ml_package="tensorflow",
+    seed=1,
     plot=True
 )

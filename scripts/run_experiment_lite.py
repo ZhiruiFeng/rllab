@@ -65,6 +65,9 @@ def run_experiment(argv):
                         help='Pickled data for variant configuration')
     parser.add_argument('--use_cloudpickle', type=ast.literal_eval, default=False)
 
+    parser.add_argument('--ml_package', type=str, default='theano',
+                        help='tensorflow or theano, default is theano')
+
     args = parser.parse_args(argv[1:])
 
     if args.seed is not None:
@@ -77,7 +80,10 @@ def run_experiment(argv):
             parallel_sampler.set_seed(args.seed)
 
     if args.plot:
-        from rllab.plotter import plotter
+        if args.ml_package == 'theano':
+            from rllab.plotter import plotter
+        else:
+            from sandbox.rocky.tf.plotter import plotter
         plotter.init_worker()
 
     if args.log_dir is None:

@@ -7,6 +7,7 @@ from sandbox.rocky.tf.samplers.batch_sampler import BatchSampler
 from sandbox.rocky.tf.samplers.vectorized_sampler import VectorizedSampler
 from rllab.sampler.utils import rollout
 
+import sandbox.rocky.tf.plotter as plotter
 
 class BatchPolopt(RLAlgorithm):
     """
@@ -88,6 +89,14 @@ class BatchPolopt(RLAlgorithm):
 
     def start_worker(self):
         self.sampler.start_worker()
+        # For asynchronous plot
+        if self.plot:
+            plotter.init_plot(self.env, self.policy)
+
+    # For showing the plots
+    def update_plot(self):
+        if self.plot:
+            plotter.update_plot(self.policy, self.max_path_length)
 
     def shutdown_worker(self):
         self.sampler.shutdown_worker()
@@ -99,39 +108,41 @@ class BatchPolopt(RLAlgorithm):
         return self.sampler.process_samples(itr, paths)
 
     def train(self, sess=None):
-        created_session = True if (sess is None) else False
+        created_session = False
         if sess is None:
             sess = tf.Session()
-            sess.__enter__()
-            
-        sess.run(tf.global_variables_initializer())
-        self.start_worker()
-        start_time = time.time()
-        for itr in range(self.start_itr, self.n_itr):
-            itr_start_time = time.time()
-            with logger.prefix('itr #%d | ' % itr):
-                logger.log("Obtaining samples...")
-                paths = self.obtain_samples(itr)
-                logger.log("Processing samples...")
-                samples_data = self.process_samples(itr, paths)
-                logger.log("Logging diagnostics...")
-                self.log_diagnostics(paths)
-                logger.log("Optimizing policy...")
-                self.optimize_policy(itr, samples_data)
-                logger.log("Saving snapshot...")
-                params = self.get_itr_snapshot(itr, samples_data)  # , **kwargs)
-                if self.store_paths:
-                    params["paths"] = samples_data["paths"]
-                logger.save_itr_params(itr, params)
-                logger.log("Saved")
-                logger.record_tabular('Time', time.time() - start_time)
-                logger.record_tabular('ItrTime', time.time() - itr_start_time)
-                logger.dump_tabular(with_prefix=False)
-                if self.plot:
-                    rollout(self.env, self.policy, animated=True, max_path_length=self.max_path_length)
-                    if self.pause_for_plot:
-                        input("Plotting evaluation run: Press Enter to "
-                              "continue...")
+            created_session = True
+        with sess.as_default():
+            sess.run(tf.global_variables_initializer())
+            tf.initialize_all_variables().run()
+            self.start_worker()
+            start_time = time.time()
+            for itr in range(self.start_itr, self.n_itr):
+                itr_start_time = time.time()
+                with logger.prefix('itr #%d | ' % itr):
+                    logger.log("Obtaining samples...")
+                    paths = self.obtain_samples(itr)
+                    logger.log("Processing samples...")
+                    samples_data = self.process_samples(itr, paths)
+                    logger.log("Logging diagnostics...")
+                    self.log_diagnostics(paths)
+                    logger.log("Optimizing policy...")
+                    self.optimize_policy(itr, samples_data)
+                    logger.log("Saving snapshot...")
+                    params = self.get_itr_snapshot(itr, samples_data)  # , **kwargs)
+                    if self.store_paths:
+                        params["paths"] = samples_data["paths"]
+                    logger.save_itr_params(itr, params)
+                    logger.log("Saved")
+                    logger.record_tabular('Time', time.time() - start_time)
+                    logger.record_tabular('ItrTime', time.time() - itr_start_time)
+                    logger.dump_tabular(with_prefix=False)
+                    if self.plot:
+                        #rollout(self.env, self.policy, animated=True, max_path_length=self.max_path_length)
+                        self.update_plot()
+                        if self.pause_for_plot:
+                            input("Plotting evaluation run: Press Enter to "
+                                  "continue...")
         self.shutdown_worker()
         if created_session:
             sess.close()
@@ -157,4 +168,3 @@ class BatchPolopt(RLAlgorithm):
 
     def optimize_policy(self, itr, samples_data):
         raise NotImplementedError
-
